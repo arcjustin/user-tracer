@@ -52,6 +52,18 @@ fn main() {
 
     /*
      * Compile a program.
+     *
+     * Note 1: This is done at run-time; does not shell out to bcc, and
+     * it doesn't require any sort of develoment environment or special
+     * libraries to be installed on the system. It gets all the type
+     * information it needs from the BTF database given on creation and
+     * uses a custom defined scripting language that compiles eBPF that can
+     * be directly inserted into the kernel as is done below.
+     *
+     * Note 2: Notice the usage of the `ExecEntry` type in both the script and
+     * in the Rust code. This is done by adding the type to the BTF database in
+     * the call above (`ExecEntry::add_to_btf(....)`). This makes usage of types
+     * between Rust and bpf-script seamless.
      */
     compiler
         .compile(
