@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-bpf-api = "0.1"
+bpf-api = "0.2"
 bpf-script = "0.1"
 btf = "0.3"
 btf-derive = "0.3"
