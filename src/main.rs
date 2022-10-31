@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use bpf_api::collections::Queue;
 use bpf_api::probes::{AttachInfo, AttachType, Probe};
 use bpf_api::prog::{Program, ProgramAttr, ProgramType};
@@ -8,16 +8,21 @@ use btf::BtfTypes;
 use btf_derive::AddToBtf;
 use clap::Parser;
 
-fn get_function_address(image_path: &str, function: Option<&String>) -> Result<u64> {
+fn get_function_address(image_path: &str, function: Option<&String>, dynamic: bool) -> Result<u64> {
     let file = std::fs::read(image_path).context("Could not read file.")?;
     let file_data = file.as_slice();
 
     let mut file = elf::File::open_stream(file_data).expect("Could not parse ELF Header");
 
-    let (symtab, strtab) = file
-        .dynamic_symbol_table()
-        .context("Failed to read symbol table")?
-        .context("File contained no symbol table")?;
+    let (symtab, strtab) = if dynamic {
+        file.dynamic_symbol_table()
+            .context("Failed to read symbol table")?
+            .context("File contained no symbol table")?
+    } else {
+        file.symbol_table()
+            .context("Failed to read symbol table")?
+            .context("File contained no symbol table")?
+    };
 
     let function = if let Some(function) = function {
         function
@@ -57,7 +62,16 @@ fn main() -> Result<()> {
     /*
      * Before anything, try to find the function address for (image_path, function)
      */
-    let address = get_function_address(&args.image_path, args.function.as_ref())?;
+    let address = if let Ok(address) =
+        get_function_address(&args.image_path, args.function.as_ref(), false)
+    {
+        address
+    } else if let Ok(address) = get_function_address(&args.image_path, args.function.as_ref(), true)
+    {
+        address
+    } else {
+        bail!("Failed to find function address")
+    };
 
     /*
      * Load types from the vmlinux BTF file and add the custom Rust type
