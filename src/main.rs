@@ -2,8 +2,9 @@ use anyhow::{bail, Context, Result};
 use bpf_api::collections::Queue;
 use bpf_api::probes::{AttachInfo, AttachType, Probe};
 use bpf_api::prog::{Program, ProgramAttr, ProgramType};
-use bpf_script::{AddToTypeDatabase, Compiler, TypeDatabase};
+use bpf_script::compiler::Compiler;
 use bpf_script_derive::AddToTypeDatabase;
+use bpf_script::types::{AddToTypeDatabase, TypeDatabase};
 use btf::Btf;
 use clap::Parser;
 
