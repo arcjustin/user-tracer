@@ -2,10 +2,9 @@ use anyhow::{bail, Context, Result};
 use bpf_api::collections::Queue;
 use bpf_api::probes::{AttachInfo, AttachType, Probe};
 use bpf_api::prog::{Program, ProgramAttr, ProgramType};
-use bpf_script::Compiler;
-use btf::traits::AddToBtf;
-use btf::BtfTypes;
-use btf_derive::AddToBtf;
+use bpf_script::{AddToTypeDatabase, Compiler, TypeDatabase};
+use bpf_script_derive::AddToTypeDatabase;
+use btf::Btf;
 use clap::Parser;
 
 fn get_function_address(image_path: &str, function: Option<&String>, dynamic: bool) -> Result<u64> {
@@ -74,11 +73,12 @@ fn main() -> Result<()> {
     };
 
     /*
-     * Load types from the vmlinux BTF file and add the custom Rust type
-     * to the database.
+     * Create a custom type database and add the `ExecEntry` structure to it.
      */
+    let mut database = TypeDatabase::default();
+
     #[repr(C, align(1))]
-    #[derive(Copy, Clone, Debug, Default, AddToBtf)]
+    #[derive(Copy, Clone, Debug, Default, AddToTypeDatabase)]
     struct ExecEntry {
         pub uid_gid: u64,
         pub args: [u64; 4],
@@ -86,13 +86,18 @@ fn main() -> Result<()> {
         pub comm: [u8; 16],
     }
 
-    let mut btf = BtfTypes::from_file("/sys/kernel/btf/vmlinux").context("Failed to parse BTF")?;
-    ExecEntry::add_to_btf(&mut btf).context("Failed to add ExecEntry to BTF")?;
+    ExecEntry::add_to_database(&mut database)
+        .context("Failed to add ExecEntry to type database.")?;
+
+    let btf = Btf::from_file("/sys/kernel/btf/vmlinux").context("Failed to parse BTF")?;
+    database
+        .add_btf_types(&btf)
+        .context("Failed to add BTF types to database.")?;
 
     /*
      * Create a BPF script compiler.
      */
-    let mut compiler = Compiler::create(&btf);
+    let mut compiler = Compiler::create(&database);
 
     /*
      * Create a shared queue and "capture" it in the compiler context.
